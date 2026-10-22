@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import Modal from '../../components/Modal';
 import ModalEntidade from '../../components/ModalEntidade';
 import TabelaJogos from '../../components/TabelaJogos';
 import {
@@ -48,6 +49,9 @@ export default function JogosPage() {
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
   const [modalDevAberto, setModalDevAberto] = useState(false);
   const [modalGeneroAberto, setModalGeneroAberto] = useState(false);
+
+  // Estado para confirmar a exclusão de um jogo no Modal
+  const [jogoParaDeletar, setJogoParaDeletar] = useState(null);
 
   useEffect(() => {
     carregarTudo();
@@ -198,19 +202,21 @@ export default function JogosPage() {
     }
   }
 
-  async function handleDeletarJogo(jogo) {
-    if (!window.confirm(`Tem certeza que deseja excluir o jogo "${jogo.nome}"?`)) return;
+  async function confirmarDeletarJogo() {
+    if (!jogoParaDeletar) return;
     try {
-      await deletarJogo(jogo.id);
-      if (editandoId === jogo.id) limparFormularioJogo();
-      exibirMensagem('sucesso', `Jogo "${jogo.nome}" removido com sucesso!`);
+      await deletarJogo(jogoParaDeletar.id);
+      if (editandoId === jogoParaDeletar.id) limparFormularioJogo();
+      exibirMensagem('sucesso', `Jogo "${jogoParaDeletar.nome}" removido com sucesso!`);
       setJogos((await listarJogos()) || []);
     } catch (err) {
-      exibirMensagem('erro', err.message || 'Erro ao excluir jogo.');
+      exibirMensagem('erro', err.message || 'Não foi possível excluir o jogo.');
+    } finally {
+      setJogoParaDeletar(null);
     }
   }
 
-  // HANDLERS SIMPLIFICADOS DE DESENVOLVEDORA E GÊNERO
+  // HANDLERS DE DESENVOLVEDORA E GÊNERO (Erros e confirmações tratados no ModalEntidade)
   async function handleSalvarDesenvolvedora(nome, idEdicao) {
     if (idEdicao) {
       await atualizarDesenvolvedora(idEdicao, nome);
@@ -222,15 +228,10 @@ export default function JogosPage() {
   }
 
   async function handleDeletarDesenvolvedora(dev) {
-    if (!window.confirm(`Deseja apagar a desenvolvedora "${dev.nome}"?`)) return;
-    try {
-      await deletarDesenvolvedora(dev.id);
-      setDesenvolvedoras((await listarDesenvolvedoras()) || []);
-      if (String(form.desenvolvedoraId) === String(dev.id)) {
-        setForm((prev) => ({ ...prev, desenvolvedoraId: '' }));
-      }
-    } catch (err) {
-      alert(err.message || 'Erro ao excluir desenvolvedora.');
+    await deletarDesenvolvedora(dev.id);
+    setDesenvolvedoras((await listarDesenvolvedoras()) || []);
+    if (String(form.desenvolvedoraId) === String(dev.id)) {
+      setForm((prev) => ({ ...prev, desenvolvedoraId: '' }));
     }
   }
 
@@ -247,17 +248,12 @@ export default function JogosPage() {
   }
 
   async function handleDeletarGenero(gen) {
-    if (!window.confirm(`Deseja apagar o gênero "${gen.nome}"?`)) return;
-    try {
-      await deletarGenero(gen.id);
-      setGeneros((await listarGeneros()) || []);
-      setForm((prev) => ({
-        ...prev,
-        generos: prev.generos.filter((id) => id !== Number(gen.id)),
-      }));
-    } catch (err) {
-      alert(err.message || 'Erro ao excluir gênero.');
-    }
+    await deletarGenero(gen.id);
+    setGeneros((await listarGeneros()) || []);
+    setForm((prev) => ({
+      ...prev,
+      generos: prev.generos.filter((id) => id !== Number(gen.id)),
+    }));
   }
 
   return (
@@ -333,7 +329,7 @@ export default function JogosPage() {
                     name="anoLancamento"
                     type="number"
                     min="1970"
-                    max="2099"
+                    max="2026"
                     required
                     value={form.anoLancamento}
                     onChange={handleChange}
@@ -488,8 +484,44 @@ export default function JogosPage() {
         carregandoLista={carregandoLista}
         editandoId={editandoId}
         onEditar={iniciarEdicaoJogo}
-        onDeletar={handleDeletarJogo}
+        onDeletar={(jogo) => setJogoParaDeletar(jogo)}
       />
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE JOGO */}
+      <Modal
+        isOpen={Boolean(jogoParaDeletar)}
+        onClose={() => setJogoParaDeletar(null)}
+        title={
+          <>
+            <span className="material-icons">warning_amber</span>
+            Confirmar Exclusão
+          </>
+        }
+      >
+        <p style={{ color: 'var(--text-main)', lineHeight: 1.5 }}>
+          Tem certeza que deseja excluir o jogo{' '}
+          <strong style={{ color: 'var(--text-bright)' }}>
+            "{jogoParaDeletar?.nome}"
+          </strong>
+          ?
+        </p>
+        <div className="form-footer">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setJogoParaDeletar(null)}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={confirmarDeletarJogo}
+          >
+            Confirmar Exclusão
+          </button>
+        </div>
+      </Modal>
 
       {/* MODAL DE DESENVOLVEDORAS */}
       <ModalEntidade

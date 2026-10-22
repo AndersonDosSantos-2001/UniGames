@@ -16,6 +16,7 @@ export default function ModalEntidade({
   const [editandoId, setEditandoId] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
+  const [itemParaDeletar, setItemParaDeletar] = useState(null);
 
   const topoModalRef = useRef(null);
   const inputNomeRef = useRef(null);
@@ -25,25 +26,27 @@ export default function ModalEntidade({
       setNome('');
       setEditandoId(null);
       setMensagem({ tipo: '', texto: '' });
+      setItemParaDeletar(null);
     }
   }, [isOpen]);
 
-  function exibirMensagem(tipo, texto) {
-    setMensagem({ tipo, texto });
-
+  function subirTopoModal() {
     setTimeout(() => {
       topoModalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 50);
+  }
+
+  function exibirMensagem(tipo, texto) {
+    setMensagem({ tipo, texto });
+    subirTopoModal();
 
     setTimeout(() => {
       setMensagem((atual) => (atual.texto === texto ? { tipo: '', texto: '' } : atual));
-    }, 4000);
+    }, 5000);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-
 
     if (!nome.trim()) {
       exibirMensagem('erro', 'Preencha o nome antes de salvar.');
@@ -67,12 +70,35 @@ export default function ModalEntidade({
     }
   }
 
+  async function handleConfirmarDelecao() {
+    if (!itemParaDeletar) return;
+    try {
+      await onDeletar(itemParaDeletar);
+      if (editandoId === itemParaDeletar.id) {
+        setEditandoId(null);
+        setNome('');
+      }
+      exibirMensagem('sucesso', `"${itemParaDeletar.nome}" removido com sucesso!`);
+    } catch (err) {
+      exibirMensagem('erro', err.message || 'Não foi possível excluir este registro.');
+    } finally {
+      setItemParaDeletar(null);
+    }
+  }
+
   function iniciarEdicao(item) {
     setEditandoId(item.id);
     setNome(item.nome);
+    setItemParaDeletar(null);
     setMensagem({ tipo: '', texto: '' });
-    topoModalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    subirTopoModal();
     inputNomeRef.current?.focus();
+  }
+
+  function solicitarDelecao(item) {
+    setMensagem({ tipo: '', texto: '' });
+    setItemParaDeletar(item);
+    subirTopoModal();
   }
 
   return (
@@ -86,9 +112,36 @@ export default function ModalEntidade({
         </>
       }
     >
-
       <div ref={topoModalRef} />
 
+      {/* CAIXA DE CONFIRMAÇÃO DE EXCLUSÃO DENTRO DO MODAL */}
+      {itemParaDeletar && (
+        <div className="modal-delete-box">
+          <span className="feedback-text-content" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="material-icons icon-md">warning_amber</span>
+            Deseja apagar <strong>"{itemParaDeletar.nome}"</strong>?
+          </span>
+
+          <div className="modal-delete-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setItemParaDeletar(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={handleConfirmarDelecao}
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BANNER DE FEEDBACK (SUCESSO OU ERRO DE EXCLUSÃO/CADASTRO) */}
       {mensagem.texto && (
         <div className={`feedback-banner ${mensagem.tipo}`} style={{ marginBottom: '14px' }}>
           <span className="feedback-text-content">
@@ -155,7 +208,7 @@ export default function ModalEntidade({
                 type="button"
                 className="btn-action-icon delete"
                 title="Excluir"
-                onClick={() => onDeletar(item)}
+                onClick={() => solicitarDelecao(item)}
               >
                 <span className="material-icons">delete_outline</span>
               </button>
