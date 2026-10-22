@@ -6,6 +6,8 @@ import {
   listarGeneros,
   listarJogos,
 } from '../../services/api';
+import BarraFiltros from '../../components/BarraFiltros';
+import DetalhesJogo from '../../components/DetalhesJogo';
 import './styles.css';
 
 export default function BibliotecaPage() {
@@ -84,77 +86,16 @@ export default function BibliotecaPage() {
     carregarJogos(filtrosLimpos);
   }
 
-  function formatarPreco(valor) {
-    if (Number(valor) === 0) return 'Gratuito para Jogar';
-    return `R$ ${Number(valor).toFixed(2).replace('.', ',')}`;
-  }
-
   return (
     <div className="library-page">
-      {/* Barra de Filtros e Pesquisa Superior */}
-      <section className="library-toolbar">
-        <div className="search-box">
-          <span className="material-icons search-icon">search</span>
-          <input
-            type="text"
-            name="nome"
-            placeholder="Buscar jogo pelo nome na biblioteca..."
-            value={filtros.nome}
-            onChange={handleFiltroChange}
-          />
-        </div>
 
-        <div className="filter-group">
-          <select
-            name="generoId"
-            value={filtros.generoId}
-            onChange={handleFiltroChange}
-          >
-            <option value="">Todos os Gêneros</option>
-            {generos.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.nome}
-              </option>
-            ))}
-          </select>
-
-          <select
-            name="desenvolvedoraId"
-            value={filtros.desenvolvedoraId}
-            onChange={handleFiltroChange}
-          >
-            <option value="">Todas as Desenvolvedoras</option>
-            {desenvolvedoras.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nome}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="number"
-            name="anoLancamento"
-            placeholder="Ano (ex: 2023)"
-            className="year-filter"
-            value={filtros.anoLancamento}
-            onChange={handleFiltroChange}
-          />
-
-          {(filtros.nome ||
-            filtros.generoId ||
-            filtros.desenvolvedoraId ||
-            filtros.anoLancamento) && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={limparFiltros}
-            >
-              <span className="material-icons icon-sm">filter_alt_off</span>
-              Limpar Filtros
-            </button>
-          )}
-        </div>
-      </section>
+      <BarraFiltros
+        filtros={filtros}
+        generos={generos}
+        desenvolvedoras={desenvolvedoras}
+        onChange={handleFiltroChange}
+        onLimpar={limparFiltros}
+      />
 
       {erro && (
         <div className="alert-error">
@@ -173,9 +114,8 @@ export default function BibliotecaPage() {
         </div>
       )}
 
-      {/*  Subtela de Detalhes */}
       <div className="library-workspace">
-        {/* Coluna Esquerda Catálogo e Grade de Capas */}
+      
         <div className="library-catalog">
           <div className="section-header">
             <h2>
@@ -227,100 +167,11 @@ export default function BibliotecaPage() {
           )}
         </div>
 
-        {/* Coluna Direita Subtela de Detalhes do Jogo Selecionado */}
-        <aside className="game-details-subscreen">
-          {jogoSelecionado ? (
-            <div className="details-card">
-              <div className="details-hero">
-                {jogoSelecionado.imagem ? (
-                  <img
-                    src={jogoSelecionado.imagem}
-                    alt={jogoSelecionado.nome}
-                    className="details-banner"
-                  />
-                ) : (
-                  <div className="details-banner-placeholder">
-                    <span className="material-icons">sports_esports</span>
-                  </div>
-                )}
-                <div className="details-hero-gradient" />
-                <div className="details-hero-title">
-                  <span className="selected-badge">DETALHES DO JOGO</span>
-                  <h1>{jogoSelecionado.nome}</h1>
-                </div>
-              </div>
 
-              <div className="details-action-bar">
-                <div className="play-box">
-                  <button
-                    type="button"
-                    className="btn-green btn-play-demo"
-                    onClick={() =>
-                      navigate(`/jogos?editar=${jogoSelecionado.id}`)
-                    }
-                    title="Ir para o gerenciamento deste jogo"
-                  >
-                    <span className="material-icons icon-sm">settings</span>
-                    GERENCIAR / EDITAR
-                  </button>
-                </div>
-                <div className="price-stat">
-                  <span className="stat-label">PREÇO NA LOJA</span>
-                  <span className="stat-value price">
-                    {formatarPreco(jogoSelecionado.preco)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="details-body">
-                <div className="meta-grid">
-                  <div className="meta-item">
-                    <span className="meta-label">DESENVOLVEDORA</span>
-                    <span className="meta-value highlight">
-                      {jogoSelecionado.desenvolvedora?.nome || 'Não informada'}
-                    </span>
-                  </div>
-                  <div className="meta-item">
-                    <span className="meta-label">ANO DE LANÇAMENTO</span>
-                    <span className="meta-value">
-                      {jogoSelecionado.ano_lancamento}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="genres-section">
-                  <span className="meta-label">GÊNEROS / MARCADORES</span>
-                  <div className="genre-tags">
-                    {jogoSelecionado.generos &&
-                    jogoSelecionado.generos.length > 0 ? (
-                      jogoSelecionado.generos.map((gen) => (
-                        <span key={gen.id} className="genre-tag">
-                          {gen.nome}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="genre-tag muted">Sem gênero vinculado</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="description-section">
-                  <h3>SOBRE ESTE JOGO</h3>
-                  <p>{jogoSelecionado.descricao}</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="details-empty">
-              <span className="material-icons empty-select-icon">ads_click</span>
-              <h3>Selecione um jogo na biblioteca</h3>
-              <p>
-                Clique em qualquer capa ao lado para visualizar a subtela com a
-                sinopse completa, gêneros, desenvolvedora e preço.
-              </p>
-            </div>
-          )}
-        </aside>
+        <DetalhesJogo
+          jogo={jogoSelecionado}
+          onEditar={(id) => navigate(`/jogos?editar=${id}`)}
+        />
       </div>
     </div>
   );

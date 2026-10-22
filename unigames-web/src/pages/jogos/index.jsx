@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Modal from '../../components/Modal';
+import ModalEntidade from '../../components/ModalEntidade';
+import TabelaJogos from '../../components/TabelaJogos';
 import {
   atualizarDesenvolvedora,
   atualizarGenero,
@@ -36,27 +37,17 @@ export default function JogosPage() {
   const [desenvolvedoras, setDesenvolvedoras] = useState([]);
   const [generos, setGeneros] = useState([]);
 
-  // Estado do formulário de Jogo (Cadastro / Edição)
+  // Estado do formulário de Jogo
   const [form, setForm] = useState(ESTADO_INICIAL_FORM);
   const [editandoId, setEditandoId] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
 
-  // Feedback e carregamento
+  // Feedback, carregamento e controle de abertura dos Modais
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [salvandoJogo, setSalvandoJogo] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
-
-  // Estados do Modal de Desenvolvedora
   const [modalDevAberto, setModalDevAberto] = useState(false);
-  const [nomeDev, setNomeDev] = useState('');
-  const [editandoDevId, setEditandoDevId] = useState(null);
-  const [salvandoDev, setSalvandoDev] = useState(false);
-
-  // Estados do Modal de Gênero
   const [modalGeneroAberto, setModalGeneroAberto] = useState(false);
-  const [nomeGenero, setNomeGenero] = useState('');
-  const [editandoGeneroId, setEditandoGeneroId] = useState(null);
-  const [salvandoGenero, setSalvandoGenero] = useState(false);
 
   useEffect(() => {
     carregarTudo();
@@ -94,11 +85,12 @@ export default function JogosPage() {
 
   function exibirMensagem(tipo, texto) {
     setMensagem({ tipo, texto });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     setTimeout(() => {
       setMensagem((atual) => (atual.texto === texto ? { tipo: '', texto: '' } : atual));
     }, 5000);
   }
-
 
   // HANDLERS DO FORMULÁRIO DE JOGO
   function handleChange(e) {
@@ -129,9 +121,7 @@ export default function JogosPage() {
     setForm(ESTADO_INICIAL_FORM);
     setEditandoId(null);
     setPreviewUrl('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function iniciarEdicaoJogo(jogo) {
@@ -146,17 +136,42 @@ export default function JogosPage() {
       imagem: null,
     });
     setPreviewUrl(jogo.imagem || '');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function handleSubmitJogo(e) {
     e.preventDefault();
 
+    // VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS
+    if (!form.nome.trim()) {
+      exibirMensagem('erro', 'O campo "Nome do Jogo" é obrigatório.');
+      return;
+    }
+
+    if (form.preco === '' || isNaN(Number(form.preco)) || Number(form.preco) < 0) {
+      exibirMensagem('erro', 'Informe um preço válido (maior ou igual a zero).');
+      return;
+    }
+
+    const ano = Number(form.anoLancamento);
+    if (!form.anoLancamento || isNaN(ano) || ano < 1970 || ano > 2026) {
+      exibirMensagem('erro', 'Informe um Ano de Lançamento válido (entre 1970 e 2026).');
+      return;
+    }
+
     if (!form.desenvolvedoraId) {
       exibirMensagem('erro', 'Selecione uma desenvolvedora para o jogo.');
+      return;
+    }
+
+    if (!form.generos || form.generos.length === 0) {
+      exibirMensagem('erro', 'Selecione pelo menos um gênero para o jogo.');
+      return;
+    }
+
+    if (!form.descricao.trim()) {
+      exibirMensagem('erro', 'O campo "Descrição / Sinopse" é obrigatório.');
       return;
     }
 
@@ -167,7 +182,6 @@ export default function JogosPage() {
 
     try {
       setSalvandoJogo(true);
-
       if (editandoId) {
         await atualizarJogo(editandoId, form);
         exibirMensagem('sucesso', `Jogo "${form.nome}" atualizado com sucesso!`);
@@ -175,10 +189,8 @@ export default function JogosPage() {
         await cadastrarJogo(form);
         exibirMensagem('sucesso', `Jogo "${form.nome}" cadastrado com sucesso!`);
       }
-
       limparFormularioJogo();
-      const listaAtualizada = await listarJogos();
-      setJogos(listaAtualizada || []);
+      setJogos((await listarJogos()) || []);
     } catch (err) {
       exibirMensagem('erro', err.message || 'Erro ao salvar o jogo.');
     } finally {
@@ -187,57 +199,33 @@ export default function JogosPage() {
   }
 
   async function handleDeletarJogo(jogo) {
-    const confirmar = window.confirm(
-      `Tem certeza que deseja excluir o jogo "${jogo.nome}"?`
-    );
-    if (!confirmar) return;
-
+    if (!window.confirm(`Tem certeza que deseja excluir o jogo "${jogo.nome}"?`)) return;
     try {
       await deletarJogo(jogo.id);
-      if (editandoId === jogo.id) {
-        limparFormularioJogo();
-      }
+      if (editandoId === jogo.id) limparFormularioJogo();
       exibirMensagem('sucesso', `Jogo "${jogo.nome}" removido com sucesso!`);
-      const listaAtualizada = await listarJogos();
-      setJogos(listaAtualizada || []);
+      setJogos((await listarJogos()) || []);
     } catch (err) {
       exibirMensagem('erro', err.message || 'Erro ao excluir jogo.');
     }
   }
 
-
-  // HANDLERS DO MODAL DE DESENVOLVEDORA
-  async function handleSalvarDesenvolvedora(e) {
-    e.preventDefault();
-    if (!nomeDev.trim()) return;
-
-    try {
-      setSalvandoDev(true);
-      if (editandoDevId) {
-        await atualizarDesenvolvedora(editandoDevId, nomeDev.trim());
-      } else {
-        const nova = await cadastrarDesenvolvedora(nomeDev.trim());
-        if (nova?.id) {
-          setForm((prev) => ({ ...prev, desenvolvedoraId: nova.id }));
-        }
-      }
-      setNomeDev('');
-      setEditandoDevId(null);
-      const listaDevs = await listarDesenvolvedoras();
-      setDesenvolvedoras(listaDevs || []);
-    } catch (err) {
-      alert(err.message || 'Erro ao salvar desenvolvedora.');
-    } finally {
-      setSalvandoDev(false);
+  // HANDLERS SIMPLIFICADOS DE DESENVOLVEDORA E GÊNERO
+  async function handleSalvarDesenvolvedora(nome, idEdicao) {
+    if (idEdicao) {
+      await atualizarDesenvolvedora(idEdicao, nome);
+    } else {
+      const nova = await cadastrarDesenvolvedora(nome);
+      if (nova?.id) setForm((prev) => ({ ...prev, desenvolvedoraId: nova.id }));
     }
+    setDesenvolvedoras((await listarDesenvolvedoras()) || []);
   }
 
   async function handleDeletarDesenvolvedora(dev) {
     if (!window.confirm(`Deseja apagar a desenvolvedora "${dev.nome}"?`)) return;
     try {
       await deletarDesenvolvedora(dev.id);
-      const listaDevs = await listarDesenvolvedoras();
-      setDesenvolvedoras(listaDevs || []);
+      setDesenvolvedoras((await listarDesenvolvedoras()) || []);
       if (String(form.desenvolvedoraId) === String(dev.id)) {
         setForm((prev) => ({ ...prev, desenvolvedoraId: '' }));
       }
@@ -246,42 +234,23 @@ export default function JogosPage() {
     }
   }
 
-
-  // HANDLERS DO MODAL DE GÊNERO
-  async function handleSalvarGenero(e) {
-    e.preventDefault();
-    if (!nomeGenero.trim()) return;
-
-    try {
-      setSalvandoGenero(true);
-      if (editandoGeneroId) {
-        await atualizarGenero(editandoGeneroId, nomeGenero.trim());
-      } else {
-        const novo = await cadastrarGenero(nomeGenero.trim());
-        if (novo?.id) {
-          setForm((prev) => ({
-            ...prev,
-            generos: [...prev.generos, Number(novo.id)],
-          }));
-        }
+  async function handleSalvarGenero(nome, idEdicao) {
+    if (idEdicao) {
+      await atualizarGenero(idEdicao, nome);
+    } else {
+      const novo = await cadastrarGenero(nome);
+      if (novo?.id) {
+        setForm((prev) => ({ ...prev, generos: [...prev.generos, Number(novo.id)] }));
       }
-      setNomeGenero('');
-      setEditandoGeneroId(null);
-      const listaGens = await listarGeneros();
-      setGeneros(listaGens || []);
-    } catch (err) {
-      alert(err.message || 'Erro ao salvar gênero.');
-    } finally {
-      setSalvandoGenero(false);
     }
+    setGeneros((await listarGeneros()) || []);
   }
 
   async function handleDeletarGenero(gen) {
     if (!window.confirm(`Deseja apagar o gênero "${gen.nome}"?`)) return;
     try {
       await deletarGenero(gen.id);
-      const listaGens = await listarGeneros();
-      setGeneros(listaGens || []);
+      setGeneros((await listarGeneros()) || []);
       setForm((prev) => ({
         ...prev,
         generos: prev.generos.filter((id) => id !== Number(gen.id)),
@@ -291,8 +260,6 @@ export default function JogosPage() {
     }
   }
 
-
-  
   return (
     <div className="jogos-page">
       {mensagem.texto && (
@@ -321,27 +288,13 @@ export default function JogosPage() {
               <span className="material-icons panel-title-icon">
                 {editandoId ? 'edit_note' : 'add_box'}
               </span>
-              {editandoId
-                ? `EDITANDO JOGO #${editandoId}`
-                : 'CADASTRAR NOVO JOGO'}
+              {editandoId ? `EDITANDO JOGO #${editandoId}` : 'CADASTRAR NOVO JOGO'}
             </h2>
-            <p>
-              Preencha as informações abaixo para adicionar ou atualizar um jogo no catálogo.
-            </p>
+            <p>Preencha as informações abaixo para adicionar ou atualizar um jogo no catálogo.</p>
           </div>
-          {editandoId && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={limparFormularioJogo}
-            >
-              <span className="material-icons icon-sm">close</span>
-              Cancelar Edição
-            </button>
-          )}
         </div>
 
-        <form className="game-form" onSubmit={handleSubmitJogo}>
+        <form className="game-form" onSubmit={handleSubmitJogo} noValidate>
           <div className="form-grid">
             <div className="form-fields">
               <div className="form-group">
@@ -388,18 +341,13 @@ export default function JogosPage() {
                 </div>
               </div>
 
-              {/* Seleção de Desenvolvedora com botão de abrir Modal */}
               <div className="form-group">
                 <div className="label-with-action">
                   <label htmlFor="desenvolvedoraId">Desenvolvedora *</label>
                   <button
                     type="button"
                     className="btn-inline-modal"
-                    onClick={() => {
-                      setNomeDev('');
-                      setEditandoDevId(null);
-                      setModalDevAberto(true);
-                    }}
+                    onClick={() => setModalDevAberto(true)}
                   >
                     <span className="material-icons icon-sm">domain_add</span>
                     Nova / Gerenciar Desenvolvedoras
@@ -421,18 +369,13 @@ export default function JogosPage() {
                 </select>
               </div>
 
-              {/* Seleção de Gêneros com botão de abrir Modal */}
               <div className="form-group">
                 <div className="label-with-action">
-                  <label>Gêneros do Jogo</label>
+                  <label>Gêneros do Jogo *</label>
                   <button
                     type="button"
                     className="btn-inline-modal"
-                    onClick={() => {
-                      setNomeGenero('');
-                      setEditandoGeneroId(null);
-                      setModalGeneroAberto(true);
-                    }}
+                    onClick={() => setModalGeneroAberto(true)}
                   >
                     <span className="material-icons icon-sm">sell</span>
                     Novo / Gerenciar Gêneros
@@ -478,9 +421,8 @@ export default function JogosPage() {
               </div>
             </div>
 
-            {/* Coluna Direita Upload e Preview da Capa */}
             <div className="form-upload">
-              <label>Imagem de Capa (Horizontal 16:9) *</label>
+              <label>Imagem de Capa (recomendado: 1280 x 600 pixels) *</label>
               <div
                 className="cover-dropzone"
                 onClick={() => fileInputRef.current?.click()}
@@ -517,11 +459,7 @@ export default function JogosPage() {
 
           <div className="form-footer">
             {editandoId && (
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={limparFormularioJogo}
-              >
+              <button type="button" className="btn-secondary" onClick={limparFormularioJogo}>
                 <span className="material-icons icon-sm">clear_all</span>
                 Limpar / Cancelar
               </button>
@@ -544,242 +482,38 @@ export default function JogosPage() {
         </form>
       </section>
 
+      {/* TABELA DE JOGOS */}
+      <TabelaJogos
+        jogos={jogos}
+        carregandoLista={carregandoLista}
+        editandoId={editandoId}
+        onEditar={iniciarEdicaoJogo}
+        onDeletar={handleDeletarJogo}
+      />
 
-      {/* TABELA EM LINHA DE JOGOS CADASTRADOS */}
-      <section className="panel-box">
-        <div className="panel-header">
-          <div>
-            <h2>
-              <span className="material-icons panel-title-icon">view_list</span>
-              JOGOS CADASTRADOS ({jogos.length})
-            </h2>
-            <p>
-              Visualize os jogos em linha e utilize os botões de ação para alterar ou apagar.
-            </p>
-          </div>
-        </div>
-
-        {carregandoLista ? (
-          <div className="table-empty">Carregando jogos cadastrados...</div>
-        ) : jogos.length === 0 ? (
-          <div className="table-empty">
-            Nenhum jogo cadastrado ainda. Utilize o formulário acima para cadastrar o primeiro!
-          </div>
-        ) : (
-          <div className="table-wrapper">
-            <table className="inline-table">
-              <thead>
-                <tr>
-                  <th className="col-capa">Capa</th>
-                  <th className="col-nome">Nome</th>
-                  <th className="col-dev">Desenvolvedora</th>
-                  <th className="col-preco">Preço</th>
-                  <th className="col-acoes">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jogos.map((jogo) => (
-                  <tr
-                    key={jogo.id}
-                    className={editandoId === jogo.id ? 'editing-row' : ''}
-                  >
-                    <td className="col-capa">
-                      <div className="table-thumb">
-                        {jogo.imagem ? (
-                          <img src={jogo.imagem} alt={jogo.nome} />
-                        ) : (
-                          <span className="material-icons thumb-placeholder-icon">image</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="col-nome">
-                      <strong>{jogo.nome}</strong>
-                      <span className="row-subtext">
-                        {jogo.ano_lancamento} •{' '}
-                        {jogo.generos?.map((g) => g.nome).join(', ') || 'Sem gênero'}
-                      </span>
-                    </td>
-                    <td className="col-dev">
-                      {jogo.desenvolvedora?.nome || '—'}
-                    </td>
-                    <td className="col-preco">
-                      R$ {Number(jogo.preco).toFixed(2).replace('.', ',')}
-                    </td>
-                    <td className="col-acoes">
-                      <div className="table-actions">
-                        <button
-                          type="button"
-                          className="btn-action-icon edit"
-                          title="Alterar Jogo"
-                          onClick={() => iniciarEdicaoJogo(jogo)}
-                        >
-                          <span className="material-icons">edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-action-icon delete"
-                          title="Apagar Jogo"
-                          onClick={() => handleDeletarJogo(jogo)}
-                        >
-                          <span className="material-icons">delete_outline</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* MODAL CADASTRO E GERENCIAMENTO DE DESENVOLVEDORAS */}
-      <Modal
+      {/* MODAL DE DESENVOLVEDORAS */}
+      <ModalEntidade
         isOpen={modalDevAberto}
         onClose={() => setModalDevAberto(false)}
-        title={
-          <>
-            <span className="material-icons">business</span>
-            Gerenciar Desenvolvedoras
-          </>
-        }
-      >
-        <form className="modal-mini-form" onSubmit={handleSalvarDesenvolvedora}>
-          <input
-            type="text"
-            required
-            placeholder="Nome da desenvolvedora (ex: Rockstar Games)"
-            value={nomeDev}
-            onChange={(e) => setNomeDev(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={salvandoDev}
-          >
-            <span className="material-icons icon-sm">
-              {editandoDevId ? 'check' : 'add'}
-            </span>
-            {editandoDevId ? 'Atualizar' : 'Adicionar'}
-          </button>
-          {editandoDevId && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setEditandoDevId(null);
-                setNomeDev('');
-              }}
-              title="Cancelar edição"
-            >
-              <span className="material-icons icon-sm">close</span>
-            </button>
-          )}
-        </form>
+        titulo="Gerenciar Desenvolvedoras"
+        icone="business"
+        placeholder="Nome da desenvolvedora (ex: Rockstar Games)"
+        itens={desenvolvedoras}
+        onSalvar={handleSalvarDesenvolvedora}
+        onDeletar={handleDeletarDesenvolvedora}
+      />
 
-        <ul className="modal-entity-list">
-          {desenvolvedoras.map((dev) => (
-            <li key={dev.id}>
-              <span>{dev.nome}</span>
-              <div className="table-actions">
-                <button
-                  type="button"
-                  className="btn-action-icon edit"
-                  title="Editar"
-                  onClick={() => {
-                    setEditandoDevId(dev.id);
-                    setNomeDev(dev.nome);
-                  }}
-                >
-                  <span className="material-icons">edit</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-action-icon delete"
-                  title="Excluir"
-                  onClick={() => handleDeletarDesenvolvedora(dev)}
-                >
-                  <span className="material-icons">delete_outline</span>
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Modal>
-
-      {/* MODAL CADASTRO E GERENCIAMENTO DE GÊNEROS */}
-      <Modal
+      {/* MODAL DE GÊNEROS */}
+      <ModalEntidade
         isOpen={modalGeneroAberto}
         onClose={() => setModalGeneroAberto(false)}
-        title={
-          <>
-            <span className="material-icons">local_offer</span>
-            Gerenciar Gêneros
-          </>
-        }
-      >
-        <form className="modal-mini-form" onSubmit={handleSalvarGenero}>
-          <input
-            type="text"
-            required
-            placeholder="Nome do gênero (ex: Terror, Corrida, RPG)"
-            value={nomeGenero}
-            onChange={(e) => setNomeGenero(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={salvandoGenero}
-          >
-            <span className="material-icons icon-sm">
-              {editandoGeneroId ? 'check' : 'add'}
-            </span>
-            {editandoGeneroId ? 'Atualizar' : 'Adicionar'}
-          </button>
-          {editandoGeneroId && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setEditandoGeneroId(null);
-                setNomeGenero('');
-              }}
-              title="Cancelar edição"
-            >
-              <span className="material-icons icon-sm">close</span>
-            </button>
-          )}
-        </form>
-
-        <ul className="modal-entity-list">
-          {generos.map((gen) => (
-            <li key={gen.id}>
-              <span>{gen.nome}</span>
-              <div className="table-actions">
-                <button
-                  type="button"
-                  className="btn-action-icon edit"
-                  title="Editar"
-                  onClick={() => {
-                    setEditandoGeneroId(gen.id);
-                    setNomeGenero(gen.nome);
-                  }}
-                >
-                  <span className="material-icons">edit</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-action-icon delete"
-                  title="Excluir"
-                  onClick={() => handleDeletarGenero(gen)}
-                >
-                  <span className="material-icons">delete_outline</span>
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Modal>
+        titulo="Gerenciar Gêneros"
+        icone="local_offer"
+        placeholder="Nome do gênero (ex: Terror, Corrida, RPG)"
+        itens={generos}
+        onSalvar={handleSalvarGenero}
+        onDeletar={handleDeletarGenero}
+      />
     </div>
   );
 }

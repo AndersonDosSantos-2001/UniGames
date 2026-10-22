@@ -24,7 +24,7 @@
 .game-card-poster {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2.14 / 1;
   background: #0e141b;
   overflow: hidden;
 }

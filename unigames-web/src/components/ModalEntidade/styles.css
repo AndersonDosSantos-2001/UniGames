@@ -1,0 +1,34 @@
+.modal-mini-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.modal-mini-form input {
+  flex: 1;
+  background: #0e141b;
+  border: 1px solid #2a475e;
+  color: var(--text-bright);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.modal-entity-list {
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+}
+
+.modal-entity-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.modal-entity-list li:last-child {
+  border-bottom: none;
+}

@@ -5,13 +5,13 @@ export default function Navbar() {
   return (
     <header className="app-navbar">
       <div className="app-navbar-container">
-        <div className="app-brand">
+        <NavLink to="/biblioteca" className="app-brand">
           <span className="material-icons app-logo-icon">sports_esports</span>
           <div>
             <span className="app-brand-title">UNIGAMES</span>
             <span className="app-brand-subtitle">LIBRARY EDITION</span>
           </div>
-        </div>
+        </NavLink>
 
         <nav className="app-nav-links">
           <NavLink
